@@ -1,0 +1,60 @@
+# Dockerfile.inference
+FROM python:3.11-slim-bookworm
+
+LABEL maintainer="mohamedshakshak455@gmail.com"
+LABEL description="MLflow inference server for titanic-classifier"
+
+# ── Environment ──────────────────────────────────────────────────────
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_NO_CACHE=1 \
+    UV_SYSTEM_PYTHON=1 \
+    PORT=5001 \
+    MODEL_STAGE=Production \
+    MODEL_REGISTRY_NAME=titanic-classifier \
+    PATH="/app/.venv/bin:$PATH"
+
+# ── System dependencies ──────────────────────────────────────────────
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Install uv ───────────────────────────────────────────────────────
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# ── Working directory ────────────────────────────────────────────────
+WORKDIR /app
+
+# ── Install inference dependencies only ──────────────────────────────
+COPY uv.lock pyproject.toml ./
+RUN uv sync --frozen --no-dev --group inference --no-install-project
+ENV PATH="/app/.venv/bin:$PATH"
+
+# ── Application code ─────────────────────────────────────────────────
+COPY src/__init__.py ./src/__init__.py
+COPY src/training/__init__.py ./src/training/__init__.py
+COPY src/training/features/ ./src/training/features/
+COPY src/training/pipeline.py ./src/training/pipeline.py
+
+# ── Entrypoint ───────────────────────────────────────────────────────
+COPY scripts/serve_model.sh ./scripts/serve_model.sh
+RUN chmod +x ./scripts/serve_model.sh
+
+# ── Security ─────────────────────────────────────────────────────────
+RUN useradd --create-home --shell /bin/bash --uid 1001 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+# ── Port ─────────────────────────────────────────────────────────────
+EXPOSE ${PORT}
+
+# ── Health check ─────────────────────────────────────────────────────
+HEALTHCHECK \
+    --interval=30s \
+    --timeout=10s \
+    --start-period=120s \
+    --retries=3 \
+    CMD curl -f http://localhost:${PORT}/ping || exit 1
+
+# ── Entrypoint ───────────────────────────────────────────────────────
+ENTRYPOINT ["./scripts/serve_model.sh"]

@@ -1,0 +1,24 @@
+# docker-compose.inference.yaml
+services:
+  titanic-inference:
+    build:
+      context: .
+      dockerfile: Dockerfile.inference
+    image: titanic-inference:latest
+    container_name: titanic-inference
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    environment:
+      - MODEL_ALIAS=Production
+      - MODEL_STAGE=Production
+      - MODEL_REGISTRY_NAME=titanic-classifier
+      - PORT=5001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/ping"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
