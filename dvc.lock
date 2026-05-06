@@ -61,15 +61,15 @@ stages:
     outs:
     - path: data/processed/
       hash: md5
-      md5: e60fbfc3b6f9ef102c72bee5b4f4efd0.dir
-      size: 63868
+      md5: 5c3d82032fd3bb0acb07564dbcf386ff.dir
+      size: 60388
       nfiles: 5
     - path: models/
       hash: md5
-      md5: eec8b05b65f8ff6e8e859bccc4526668.dir
-      size: 2220789
+      md5: 6a8b00e85f04e37e505a47d743756796.dir
+      size: 2220725
       nfiles: 2
     - path: reports/metrics.json
       hash: md5
-      md5: e8fafe36856a6caa70de33a670c07cda
+      md5: ebf5a371e1f0061728dd0ea77d9ebeb0
       size: 175
