@@ -16,6 +16,7 @@ if experiment is None:
 # Find the best run by roc_auc
 best_run = client.search_runs(
     experiment_ids=[experiment.experiment_id],
+    filter_string="status = 'FINISHED'",
     order_by=["metrics.roc_auc DESC"],
     max_results=1,
 )[0]
@@ -32,11 +33,19 @@ print(f"ROC-AUC: {best_roc_auc:.4f}")
 versions = client.search_model_versions(f"name='titanic-classifier'")
 best_version = next(v for v in versions if v.run_id == best_run_id)
 
+if best_version is None:
+    raise ValueError(
+        f"No registered version found for run {best_run_id}. "
+        "Make sure registered_model_name='titanic-classifier' is set in trainer.py."
+    )
+    
+print(f"Found version: {best_version.version}")
 
-# Promote to Production
-client.transition_model_version_stage(
+
+client.set_registered_model_alias(
     name="titanic-classifier",
+    alias="Production",
     version=best_version.version,
-    stage="Production",
 )
-print(f"Promoted version {best_version.version} to Production")
+
+print(f"Set alias 'Production' → version {best_version.version}")

@@ -42,7 +42,7 @@ def run_download(cfg: DictConfig) -> None:
 def run_train(cfg: DictConfig) -> None:
     train_df= load_raw_data(cfg)
 
-    X = train_df.drop(columns=["Survived"])
+    X = train_df.drop(columns=["Survived", "PassengerId"])
     y = train_df["Survived"]
     X_train, X_val, y_train, y_val = train_test_split(
         X, y,
