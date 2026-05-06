@@ -3390,6 +3390,16 @@ dependencies = [
     { name = "typer" },
 ]
 
+[package.dev-dependencies]
+inference = [
+    { name = "flask" },
+    { name = "mlflow" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "python-dotenv" },
+    { name = "scikit-learn" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "dagshub", specifier = ">=0.7.0" },
@@ -3414,6 +3424,16 @@ requires-dist = [
     { name = "scikit-learn" },
     { name = "tqdm" },
     { name = "typer" },
+]
+
+[package.metadata.requires-dev]
+inference = [
+    { name = "flask", specifier = ">=3.1.3" },
+    { name = "mlflow", specifier = ">=3.11.1" },
+    { name = "numpy", specifier = ">=2.4.4" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "scikit-learn", specifier = ">=1.8.0" },
 ]
 
 [[package]]
