@@ -1,7 +1,7 @@
 # src/deploymen/online/api.py
 
-from request import PassengerFeatures
-from response import PredictionResponse, HealthResponse
+from .request import PassengerFeatures
+from .response import PredictionResponse, HealthResponse
 
 import logging
 import os
