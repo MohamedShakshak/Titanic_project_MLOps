@@ -1,0 +1,24 @@
+data:
+  raw_dir: data/raw
+  raw_train_path: data/raw/train.csv
+  raw_test_path: data/raw/test.csv
+  processed_path: data/processed/
+  competition_name: titanic
+  test_size: 0.2
+  random_state: 42
+  overwrite: true
+model:
+  name: logistic
+  params:
+    C: 1.0
+    max_iter: 1000
+    random_state: 42
+training:
+  test_size: 0.2
+  random_state: 42
+  model_output_dir: models/
+  metrics_output_dir: reports/
+mlflow:
+  experiment_name: titanic-training
+  tracking_uri: ${oc.env:MLFLOW_TRACKING_URI,mlruns}
+stage: train

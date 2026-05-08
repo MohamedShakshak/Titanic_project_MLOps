@@ -10,7 +10,7 @@ stages:
         - data.overwrite
     outs:
       - data/raw/train.csv
-      # - data/raw/test.csv
+      - data/raw/test.csv
   
   train:
     cmd: uv run python trainer.py --config-name config stage=train
