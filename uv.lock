@@ -3975,6 +3975,15 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+batch = [
+    { name = "duckdb" },
+    { name = "mlflow" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "prefect" },
+    { name = "python-dotenv" },
+    { name = "scikit-learn" },
+]
 inference = [
     { name = "flask" },
     { name = "mlflow" },
@@ -4014,6 +4023,15 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+batch = [
+    { name = "duckdb", specifier = ">=1.5.2" },
+    { name = "mlflow", specifier = ">=3.11.1" },
+    { name = "numpy", specifier = ">=2.4.4" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "prefect", specifier = ">=3.7.0" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "scikit-learn", specifier = ">=1.8.0" },
+]
 inference = [
     { name = "flask", specifier = ">=3.1.3" },
     { name = "mlflow", specifier = ">=3.11.1" },

@@ -58,6 +58,15 @@ known-first-party = ["src"]
 force-sort-within-sections = true
 
 [dependency-groups]
+batch = [
+    "duckdb>=1.5.2",
+    "mlflow>=3.11.1",
+    "numpy>=2.4.4",
+    "pandas>=2.3.3",
+    "prefect>=3.7.0",
+    "python-dotenv>=1.2.2",
+    "scikit-learn>=1.8.0",
+]
 inference = [
     "flask>=3.1.3",
     "mlflow>=3.11.1",
