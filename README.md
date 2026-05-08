@@ -9,7 +9,7 @@
 This repository contains an end-to-end MLOps workflow for the Titanic survival
 prediction task. It uses DVC to reproduce the data and training pipeline, Hydra
 and `params.yaml` for configuration, MLflow for experiment tracking and model
-registry management, and Docker Compose for serving the promoted model.
+registry management, and Docker-based services for online inference.
 
 The default workflow trains a scikit-learn pipeline that includes feature
 engineering, preprocessing, model fitting, evaluation, local artifact storage,
@@ -25,7 +25,8 @@ and MLflow model registration.
 - Feature engineering with custom scikit-learn transformers
 - MLflow experiment tracking and model registry integration
 - Best-model promotion to the `Production` alias
-- Dockerized MLflow inference server
+- Dockerized MLflow registry-backed inference server
+- FastAPI no-registry online inference service that loads a local model file
 - Pytest, Ruff, and MkDocs project tooling
 
 ## Tech Stack
@@ -38,6 +39,7 @@ and MLflow model registration.
 - scikit-learn
 - pandas / NumPy
 - joblib
+- FastAPI / Uvicorn / Pydantic
 - Docker / Docker Compose
 - pytest and Ruff
 
@@ -65,7 +67,13 @@ Titanic_project_MLOps/
 |-- scripts/
 |   |-- predict.py
 |   `-- serve_model.sh
+|-- server.py
 |-- src/
+|   |-- deployment/
+|   |   `-- online/
+|   |       |-- api.py
+|   |       |-- request.py
+|   |       `-- response.py
 |   |-- prediction/
 |   |   `-- predict.py
 |   `-- training/
@@ -82,6 +90,8 @@ Titanic_project_MLOps/
 |-- tests/
 |-- docker-compose.inference.yaml
 |-- Dockerfile.inference
+|-- Dockerfile.online.no_registry
+|-- Dockerfile.online.no_registry.dockerignore
 |-- dvc.yaml
 |-- params.yaml
 |-- pyproject.toml
@@ -135,11 +145,12 @@ MODEL_ALIAS="Production"
 MODEL_STAGE="Production"
 MODEL_REGISTRY_NAME="titanic-classifier"
 PORT="5001"
+MODEL_PATH="models/logistic_pipeline.pkl"
 ```
 
 For local MLflow runs, `MLFLOW_TRACKING_URI` can point to a local file store or
 database. The Hydra MLflow config defaults to `mlruns` when no environment
-variable is set.
+variable is set. `MODEL_PATH` is used by the no-registry FastAPI service.
 
 ## Data Access
 
@@ -283,6 +294,15 @@ version, and assigns the `Production` alias to that version.
 
 ## Inference
 
+The project currently has two online inference options:
+
+- MLflow registry-backed serving through `Dockerfile.inference` and
+  `docker-compose.inference.yaml`
+- No-registry FastAPI serving through `Dockerfile.online.no_registry` and
+  `server.py`
+
+### MLflow Registry-backed Serving
+
 After a model has been trained, registered, and promoted to `Production`, start
 the inference service:
 
@@ -317,6 +337,53 @@ uv run python src/prediction/predict.py
 Prediction inputs should use the raw Titanic-style columns expected by the
 training pipeline. The saved model includes the preprocessing and feature
 engineering steps.
+
+### No-registry FastAPI Serving
+
+The no-registry service loads a local `joblib` pipeline directly from
+`MODEL_PATH`. By default, the Dockerfile uses:
+
+```text
+models/logistic_pipeline.pkl
+```
+
+Build the image:
+
+```bash
+docker build -f Dockerfile.online.no_registry -t titanic-online-no-registry .
+```
+
+Run it with the default model path:
+
+```bash
+docker run --rm -p 8000:8000 titanic-online-no-registry
+```
+
+Or serve the Random Forest artifact:
+
+```bash
+docker run --rm -p 8000:8000 -e MODEL_PATH=models/random_forest_pipeline.pkl titanic-online-no-registry
+```
+
+Health check:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Prediction endpoint:
+
+```text
+POST http://localhost:8000/api/v1/predict
+```
+
+Example request:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/predict \
+  -H "Content-Type: application/json" \
+  -d "{\"Pclass\":1,\"Sex\":\"female\",\"Age\":29.0,\"SibSp\":0,\"Parch\":0,\"Fare\":211.3,\"Embarked\":\"S\",\"Name\":\"Cumings, Mrs. John Bradley\",\"Ticket\":\"PC 17599\",\"Cabin\":\"C85\"}"
+```
 
 ## Development Commands
 
@@ -359,11 +426,15 @@ mkdocs serve -f docs/mkdocs.yml
 - MLflow experiment: `titanic-training`
 - MLflow registered model: `titanic-classifier`
 - Production model URI for serving: `models:/titanic-classifier@Production`
+- No-registry API health endpoint: `GET /health`
+- No-registry API prediction endpoint: `POST /api/v1/predict`
 
 ## Notes
 
 - Use `dvc repro` as the default way to reproduce the project pipeline.
 - Use `params.yaml` for experiment changes that DVC should track.
 - Use MLflow to compare runs, inspect artifacts, and manage production aliases.
-- Use Docker Compose only after a model version has been promoted to
+- Use the MLflow Docker Compose path only after a model version has been promoted to
   `Production`.
+- Use the no-registry FastAPI image when you want to serve a local model file
+  directly without depending on the MLflow model registry at runtime.
