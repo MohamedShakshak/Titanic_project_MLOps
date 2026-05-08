@@ -9,7 +9,8 @@
 This repository contains an end-to-end MLOps workflow for the Titanic survival
 prediction task. It uses DVC to reproduce the data and training pipeline, Hydra
 and `params.yaml` for configuration, MLflow for experiment tracking and model
-registry management, and Docker-based services for online inference.
+registry management, Docker-based services for online inference, and a Prefect
+batch prediction flow backed by MotherDuck.
 
 The default workflow trains a scikit-learn pipeline that includes feature
 engineering, preprocessing, model fitting, evaluation, local artifact storage,
@@ -27,6 +28,7 @@ and MLflow model registration.
 - Best-model promotion to the `Production` alias
 - Dockerized MLflow registry-backed inference server
 - FastAPI no-registry online inference service that loads a local model file
+- Prefect batch prediction flow using MotherDuck as input and output storage
 - Pytest, Ruff, and MkDocs project tooling
 
 ## Tech Stack
@@ -40,6 +42,8 @@ and MLflow model registration.
 - pandas / NumPy
 - joblib
 - FastAPI / Uvicorn / Pydantic
+- Prefect
+- DuckDB / MotherDuck
 - Docker / Docker Compose
 - pytest and Ruff
 
@@ -65,11 +69,18 @@ Titanic_project_MLOps/
 |-- models/
 |-- reports/
 |-- scripts/
+|   |-- load_to_motherduck.py
 |   |-- predict.py
 |   `-- serve_model.sh
 |-- server.py
 |-- src/
 |   |-- deployment/
+|   |   |-- batch/
+|   |   |   |-- extract.py
+|   |   |   |-- flow.py
+|   |   |   |-- load.py
+|   |   |   |-- predict.py
+|   |   |   `-- transform.py
 |   |   `-- online/
 |   |       |-- api.py
 |   |       |-- request.py
@@ -137,20 +148,31 @@ Copy `.env.example` to `.env` and fill in the values required for your MLflow
 setup:
 
 ```bash
-MLFLOW_TRACKING_URI=""
-MLFLOW_TRACKING_USERNAME=""
-MLFLOW_TRACKING_PASSWORD=""
+# Kaggle
+KAGGLE_USERNAME=your_username
+KAGGLE_KEY=your_kaggle_key
 
-MODEL_ALIAS="Production"
-MODEL_STAGE="Production"
-MODEL_REGISTRY_NAME="titanic-classifier"
-PORT="5001"
-MODEL_PATH="models/logistic_pipeline.pkl"
+# DagsHub / MLflow
+MLFLOW_TRACKING_URI=https://dagshub.com/your_username/your_repo.mlflow
+MLFLOW_TRACKING_USERNAME=your_username
+MLFLOW_TRACKING_PASSWORD=your_dagshub_token
+
+# MotherDuck
+MOTHERDUCK_TOKEN=your_motherduck_token
+
+# Prefect Cloud, optional
+PREFECT_API_KEY=your_prefect_api_key
+PREFECT_API_URL=https://api.prefect.io
 ```
 
 For local MLflow runs, `MLFLOW_TRACKING_URI` can point to a local file store or
 database. The Hydra MLflow config defaults to `mlruns` when no environment
-variable is set. `MODEL_PATH` is used by the no-registry FastAPI service.
+variable is set.
+
+The serving containers also use runtime settings such as `MODEL_ALIAS`,
+`MODEL_STAGE`, `MODEL_REGISTRY_NAME`, `PORT`, and `MODEL_PATH`. The Compose file
+sets the MLflow serving defaults, and the no-registry Dockerfile defaults to
+`MODEL_PATH=models/logistic_pipeline.pkl`.
 
 ## Data Access
 
@@ -159,6 +181,7 @@ dataset into:
 
 ```text
 data/raw/train.csv
+data/raw/test.csv
 ```
 
 Make sure your Kaggle credentials are available before running the pipeline.
@@ -207,6 +230,7 @@ Tracks these parameters from `params.yaml`:
 Produces:
 
 - `data/raw/train.csv`
+- `data/raw/test.csv`
 
 ### `train` Stage
 
@@ -228,6 +252,48 @@ Produces:
 - `data/processed/`
 - `models/`
 - `reports/metrics.json`
+
+## Batch Prediction
+
+Batch prediction code lives under `src/deployment/batch/`. The flow is defined
+in `src/deployment/batch/flow.py` and orchestrated with Prefect.
+
+The batch flow:
+
+- Extracts passenger rows from MotherDuck table `titanic.test_passengers`
+- Cleans and validates the raw Titanic-style columns
+- Loads the `titanic-classifier` production model from the MLflow registry
+- Runs predictions and survival probabilities
+- Appends results to MotherDuck table `titanic.predictions`
+
+Before running the batch flow, load the Titanic test data into MotherDuck:
+
+```bash
+uv run python scripts/load_to_motherduck.py
+```
+
+Then run the flow directly:
+
+```bash
+uv run python src/deployment/batch/flow.py
+```
+
+Default flow parameters:
+
+```text
+database: titanic
+input_table: test_passengers
+output_table: predictions
+model_name: titanic-classifier
+model_stage: Production
+```
+
+Required environment variables:
+
+- `MOTHERDUCK_TOKEN`
+- `MLFLOW_TRACKING_URI`
+- `MLFLOW_TRACKING_USERNAME`
+- `MLFLOW_TRACKING_PASSWORD`
 
 ## Configuration
 
@@ -420,6 +486,7 @@ mkdocs serve -f docs/mkdocs.yml
 ## Key Artifacts
 
 - `data/raw/train.csv`: downloaded Titanic training data
+- `data/raw/test.csv`: downloaded Titanic test data for batch scoring
 - `data/processed/`: train and validation splits
 - `models/<model_name>_pipeline.pkl`: local joblib copy of the fitted pipeline
 - `reports/metrics.json`: latest DVC-tracked evaluation metrics
@@ -428,12 +495,15 @@ mkdocs serve -f docs/mkdocs.yml
 - Production model URI for serving: `models:/titanic-classifier@Production`
 - No-registry API health endpoint: `GET /health`
 - No-registry API prediction endpoint: `POST /api/v1/predict`
+- Batch input table: `titanic.test_passengers`
+- Batch output table: `titanic.predictions`
 
 ## Notes
 
 - Use `dvc repro` as the default way to reproduce the project pipeline.
 - Use `params.yaml` for experiment changes that DVC should track.
 - Use MLflow to compare runs, inspect artifacts, and manage production aliases.
+- Use the batch flow when predictions should be written back to MotherDuck.
 - Use the MLflow Docker Compose path only after a model version has been promoted to
   `Production`.
 - Use the no-registry FastAPI image when you want to serve a local model file
